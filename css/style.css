@@ -497,7 +497,6 @@ main section[id] {
 }
 
 
-.primary-button:disabled,
 .primary-button[aria-disabled="true"] {
 
     opacity: 0.6;
@@ -505,6 +504,10 @@ main section[id] {
     cursor: not-allowed;
 
     transform: none;
+
+    box-shadow:
+        0 10px 30px
+        rgba(34, 211, 238, 0.15);
 }
 
 

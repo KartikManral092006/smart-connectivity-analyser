@@ -15,6 +15,10 @@ let backendQuality = null;
 let speedTestFinished = false;
 let backendTestFinished = false;
 
+// Set once finishCombinedTest() has run for the current test,
+// so a late callback cannot save the same test twice.
+let testFinalized = false;
+
 let sessionTests = [];
 let savedLocations = [];
 let networkChart = null;
@@ -345,6 +349,7 @@ async function startInternetTest() {
     testStartTime = Date.now();
     speedTestFinished = false;
     backendTestFinished = false;
+    testFinalized = false;
     backendQuality = null;
 
     resetCurrentTestUI();
@@ -478,6 +483,13 @@ async function runCloudflareSpeedTest() {
         };
 
 
+        /*
+           The library keeps running after onError: it either
+           moves on to the next measurement or ends the test,
+           and both paths call onFinish afterwards. So onError
+           must not finish the test, or it is saved twice.
+        */
+
         speedTest.onError = error => {
 
             console.error(
@@ -486,14 +498,10 @@ async function runCloudflareSpeedTest() {
             );
 
 
-            speedTestFinished = true;
-
             setTestMessage(
-                "Speed test completed with limited measurements."
+                "A speed measurement failed. " +
+                "Continuing with the remaining measurements..."
             );
-
-
-            checkIfEverythingFinished();
         };
 
 
@@ -506,16 +514,20 @@ async function runCloudflareSpeedTest() {
 
         testTimeout = setTimeout(() => {
 
-            if (
-                speedTest &&
-                speedTest.isRunning
-            ) {
+            // Also covers a test that stopped without calling
+            // onFinish, now that onError no longer ends it.
+            if (!speedTestFinished) {
 
                 console.warn(
                     "Cloudflare test timeout."
                 );
 
-                speedTest.pause();
+                if (
+                    speedTest &&
+                    speedTest.isRunning
+                ) {
+                    speedTest.pause();
+                }
 
                 speedTestFinished = true;
 
@@ -840,11 +852,14 @@ function checkIfEverythingFinished() {
 
     if (
         !speedTestFinished ||
-        !backendTestFinished
+        !backendTestFinished ||
+        testFinalized
     ) {
         return;
     }
 
+
+    testFinalized = true;
 
     finishCombinedTest();
 }
